@@ -1,3 +1,5 @@
+const API_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
+
 export type Session = {
   id: string;
   started_at: string;
@@ -5,42 +7,30 @@ export type Session = {
   notes?: string | null;
 };
 
-export const __debug_client_version = "v1";
+export type Event = {
+  ts: string;
+  type: string; // attention/offroad/phone/drowsy
+  value: number | boolean;
+  confidence: number;
+};
 
-const envBaseUrl = import.meta.env.VITE_API_URL as string | undefined;
-const API_BASE_URL =
-  envBaseUrl && envBaseUrl.trim().length > 0
-    ? envBaseUrl
-    : "http://localhost:8000";
-
-type RequestOptions = RequestInit & { signal?: AbortSignal };
-
-async function requestJson<T>(path: string, options?: RequestOptions): Promise<T> {
-  const url = new URL(path, API_BASE_URL);
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      Accept: "application/json",
-      ...options?.headers,
-    },
-  });
-
+async function requestJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(url, { signal });
   if (!res.ok) {
-    let details = "";
-    try {
-      const data = (await res.json()) as { detail?: unknown };
-      if (data?.detail) {
-        details = `: ${typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail)}`;
-      }
-    } catch {
-      // Ignore parsing errors and fall back to status text only.
-    }
-    throw new Error(`API ${res.status} ${res.statusText}${details}`);
+    const text = await res.text().catch(() => "");
+    throw new Error(`API ${res.status}: ${text || res.statusText}`);
   }
-
-  return (await res.json()) as T;
+  return res.json() as Promise<T>;
 }
 
-export async function getSessions(signal?: AbortSignal): Promise<Session[]> {
-  return requestJson<Session[]>("/sessions", { signal });
+export function getSessions(signal?: AbortSignal): Promise<Session[]> {
+  return requestJson<Session[]>(`${API_URL}/sessions`, signal);
+}
+
+export function getSession(id: string, signal?: AbortSignal): Promise<Session> {
+  return requestJson<Session>(`${API_URL}/sessions/${id}`, signal);
+}
+
+export function getSessionEvents(id: string, signal?: AbortSignal): Promise<Event[]> {
+  return requestJson<Event[]>(`${API_URL}/sessions/${id}/events`, signal);
 }
