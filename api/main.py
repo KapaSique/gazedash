@@ -1,7 +1,7 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -12,6 +12,19 @@ class Session(BaseModel):
     source: str
     notes: str | None = None
 
+class Event(BaseModel):
+    ts: str
+    type: str
+    value: float | bool
+    confidence: float
+    
+class Stats(BaseModel):
+    session_id: str
+    events_total: int
+    attention_avg: float
+    offroad_count: int
+    phone_count: int
+    drowsy_count: int
 
 app = FastAPI(title="GazeDash API")
 
@@ -23,6 +36,38 @@ app.add_middleware(
     allow_headers = ["*"],
 )
 
+NOW = datetime.now(timezone.utc)
+
+MOCK_SESSIONS: dict[str, Session] = {
+    "s1": Session(
+        id = "s1",
+        started_at = NOW.isoformat(),
+        source = "mock",
+        notes = "First test session",
+    ),
+    "s2": Session(
+        id = "s2",
+        started_at = NOW.isoformat(),
+        source = "mock",
+        notes = "Second test session",
+    ),
+}
+
+MOCK_EVENTS: dict[str, List[Event]] = {
+    "s1": [
+        Event(ts = (NOW + timedelta(seconds = 5)).isoformat(), type = "attention", value = 0.92, confidence = 0.88),
+        Event(ts = (NOW + timedelta(seconds = 12)).isoformat(), type = "offroad", value = True, confidence = 0.90),
+        Event(ts = (NOW + timedelta(seconds = 20)).isoformat(), type = "phone", value = False, confidence = 0.70),
+        Event(ts = (NOW + timedelta(seconds = 30)).isoformat(), type = "drowsy", value = False, confidence = 0.85),
+    ],
+    "s2": [
+        Event(ts = (NOW + timedelta(seconds = 6)).isoformat(), type = "attention", value = 0.78, confidence = 0.86),
+        Event(ts = (NOW + timedelta(seconds = 18)).isoformat(), type = "offroad", value = False, confidence = 0.92),
+        Event(ts = (NOW + timedelta(seconds = 26)).isoformat(), type = "phone", value = True, confidence = 0.80),
+        Event(ts = (NOW + timedelta(seconds = 40)).isoformat(), type = "drowsy", value = True, confidence = 0.76),
+    ],
+}
+
 @app.get("/")
 def root():
     return {"service": "GazeDash API", "docs": "/docs"}
@@ -33,9 +78,39 @@ def health():
 
 @app.get("/sessions", response_model=List[Session])
 def list_sessions():
-    now = datetime.now(timezone.utc).isoformat()
-    return [
-        {"id": "s1", "started_at": now, "source": "mock", "notes": "First test session"},
-        {"id": "s2", "started_at": now, "source": "mock", "notes": "Second test session"},
+    return list(MOCK_SESSIONS.values())
 
-    ]
+@app.get("/sessions/{session_id}", response_model=Session)
+def get_session(session_id:str):
+    s = MOCK_SESSIONS.get(session_id)
+    if not s:
+        raise HTTPException(status_code = 404, detail = "Session 6y44aHbI Emte")
+    return s
+
+@app.get("/sessions/{session_id}/events", response_model=List[Event])
+def get_session_events(session_id: str):
+    if session_id not in MOCK_SESSIONS:
+        raise HTTPException(status_code = 404, detail = "Session 6y44aHbI Emte")
+    return MOCK_EVENTS.get(session_id, [])
+
+@app.get("/sessions/{session_id}/stats", response_model=Stats)
+def get_session_stats(session_id: str):
+    if session_id not in MOCK_SESSIONS:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    events = MOCK_EVENTS.get(session_id, [])
+
+    att = [e.value for e in events if e.type == "attention" and isinstance(e.value, (int, float)) and not isinstance(e.value, bool)]
+    attention_avg = float(sum(att)/len(att)) if att else 0.0
+
+    def count_true(t: str) -> int:
+        return sum(1 for e in events if e.type == t and e.value is True)
+    
+    return Stats(
+        session_id=session_id,
+        events_total=len(events),
+        attention_avg=attention_avg,
+        offroad_count=count_true("offroad"),
+        phone_count=count_true("phone"),
+        drowsy_count=count_true("drowsy"),
+    )
