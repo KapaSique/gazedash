@@ -85,6 +85,7 @@ export default function SessionDetail() {
     <div style = {page}>
       <div style = {{marginBottom : 12}}>
         <Link to = "/sessions">Back to sessions</Link>
+        <Link to = {`/sessions/${id}/timeline`}>Timeline</Link>
       </div>
 
       <h2>{title}</h2>
