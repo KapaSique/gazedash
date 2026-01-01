@@ -21,10 +21,15 @@ class Event(BaseModel):
 class Stats(BaseModel):
     session_id: str
     events_total: int
-    attention_avg: float
+    duration_sec: float
+    attention_avg: float          
+    attention_pct: float          
     offroad_count: int
     phone_count: int
     drowsy_count: int
+    offroad_pct: float
+    phone_pct: float
+    drowsy_pct: float
 
 app = FastAPI(title="GazeDash API")
 
@@ -84,33 +89,72 @@ def list_sessions():
 def get_session(session_id:str):
     s = MOCK_SESSIONS.get(session_id)
     if not s:
-        raise HTTPException(status_code = 404, detail = "Session 6y44aHbI Emte")
+        raise HTTPException(status_code=404, detail="Session not found")
     return s
 
 @app.get("/sessions/{session_id}/events", response_model=List[Event])
 def get_session_events(session_id: str):
     if session_id not in MOCK_SESSIONS:
-        raise HTTPException(status_code = 404, detail = "Session 6y44aHbI Emte")
+        raise HTTPException(status_code=404, detail="Session not found")
     return MOCK_EVENTS.get(session_id, [])
 
 @app.get("/sessions/{session_id}/stats", response_model=Stats)
 def get_session_stats(session_id: str):
     if session_id not in MOCK_SESSIONS:
         raise HTTPException(status_code=404, detail="Session not found")
-    
-    events = MOCK_EVENTS.get(session_id, [])
 
-    att = [e.value for e in events if e.type == "attention" and isinstance(e.value, (int, float)) and not isinstance(e.value, bool)]
-    attention_avg = float(sum(att)/len(att)) if att else 0.0
+    events = MOCK_EVENTS.get(session_id, [])
+    total = len(events)
+    if total == 0:
+        return Stats(
+            session_id=session_id,
+            events_total=0,
+            duration_sec=0,
+            attention_pct=0.0,
+            offroad_pct=0.0,
+            phone_pct=0.0,
+            drowsy_pct=0.0,
+        )
+    att = [
+        float(e.value)
+        for e in events
+        if e.type == "attention"
+        and isinstance(e.value, (int, float))
+        and not isinstance(e.value, bool)
+    ]
+
+    attention_avg = float(sum(att) / len(att)) if att else 0.0
+    attention_pct = attention_avg * 100.0 if attention_avg <= 1.0 else attention_avg
 
     def count_true(t: str) -> int:
         return sum(1 for e in events if e.type == t and e.value is True)
-    
+
+    offroad_count = count_true("offroad")
+    phone_count = count_true("phone")
+    drowsy_count = count_true("drowsy")
+
+    def pct(count: int, denom: int) -> float:
+        return float(count) / float(denom) * 100.0 if denom > 0 else 0.0
+
+    if total >= 2:
+        times = [datetime.fromisoformat(e.ts) for e in events]
+        duration_sec = float((max(times) - min(times)).total_seconds())
+    else:
+        duration_sec = 0.0
+
     return Stats(
         session_id=session_id,
-        events_total=len(events),
+        events_total=total,
+        duration_sec=duration_sec,
+
         attention_avg=attention_avg,
-        offroad_count=count_true("offroad"),
-        phone_count=count_true("phone"),
-        drowsy_count=count_true("drowsy"),
+        attention_pct=attention_avg * 100.0,
+
+        offroad_count=offroad_count,
+        phone_count=phone_count,
+        drowsy_count=drowsy_count,
+
+        offroad_pct=pct(offroad_count, total),
+        phone_pct=pct(phone_count, total),
+        drowsy_pct=pct(drowsy_count, total),
     )

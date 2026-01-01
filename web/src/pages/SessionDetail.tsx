@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams} from "react-router-dom";
+import { HttpError } from "../shared/api/http";
 import * as api from "../shared/api/client";
 
 type Session = api.Session;
@@ -13,14 +14,13 @@ export default function SessionDetail() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<api.Stats | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc"> ("asc");
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
   const page: React.CSSProperties = {padding: 16};
   const cell: React.CSSProperties = {padding: 8, borderBottom: "1px solid #222"};
   const headCell: React.CSSProperties = {padding: 8, borderBottom: "1px solid #333"};
-  const statsCell: React.CSSProperties = {padding: 12, border: "1px solid #222", borderRadius: 8};
 
   const title = useMemo(() => (id ? `Session ${id}` : "Session"), [id]);
 
@@ -61,6 +61,14 @@ export default function SessionDetail() {
         setStats(st);
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return;
+
+        if (e instanceof HttpError) {
+          const body = e.body as any;
+          const detail = body && typeof body === "object" && "detail" in body ? String(body.detail) : "";
+          setError(detail ? `${e.status}: ${detail}` : `${e.status}: ${e.message}`);
+          return;
+        }
+
         setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
         setLoading(false);
@@ -104,16 +112,17 @@ export default function SessionDetail() {
 
       {stats ? (
         <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-          <div style={statsCell}>Attention avg: {stats.attention_avg.toFixed(2)}</div>
-          <div style={statsCell}>Offroad: {stats.offroad_count}</div>
-          <div style={statsCell}>Phone: {stats.phone_count}</div>
-          <div style={statsCell}>Drowsy: {stats.drowsy_count}</div>
-          <div style={statsCell}>Events: {stats.events_total}</div>
+          <StatCard label="Events total" value={stats.events_total} />
+          <StatCard label="Duration" value={formatDuration(stats.duration_sec ?? 0)} />
+          <StatCard label="Attention" value={`${(stats.attention_pct ?? 0).toFixed(1)}%`} />
+          <StatCard label="Offroad" value={`${(stats.offroad_pct ?? 0).toFixed(1)}%`} />
+          <StatCard label="Phone" value={`${(stats.phone_pct ?? 0).toFixed(1)}%`} />
+          <StatCard label="Drowsy" value={`${(stats.drowsy_pct ?? 0).toFixed(1)}%`} />
         </div>
       ) : null}
 
       <h3>Events</h3>
-      {events.length === 0 ?(
+      {filteredEvents.length === 0 ?(
         <div>No events</div>
       ) : (
         <table style={{width: "100%", borderCollapse: "collapse"}}>
@@ -158,4 +167,13 @@ function StatCard({label, value} : {label: string; value: React.ReactNode,}){
       <div style = {{fontSize: 22, fontWeight: 700}}>{value}</div>
     </div>
   );
+}
+
+function formatDuration(sec: number){
+  if (!Number.isFinite(sec) || sec <= 0) return "0s";
+  const s = Math.floor(sec);
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (m <= 0) return `${r}s`;
+  return `${m}m ${String(r).padStart(2, "0")}s`;
 }
