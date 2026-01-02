@@ -19,10 +19,19 @@ export type Event = {
 export type Stats = {
     session_id: string;
     events_total: number;
+
+    duration_sec: number;
+
     attention_avg: number;
+    attention_pct: number;
+
     offroad_count: number;
     phone_count: number;
     drowsy_count: number;
+
+    offroad_pct: number;
+    phone_pct: number;
+    drowsy_pct: number;
 };
 
 // async function requestJson<T>(url: string, signal?: AbortSignal): Promise<T> {
