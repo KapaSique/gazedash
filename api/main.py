@@ -3,7 +3,7 @@ from typing import List
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Session(BaseModel):
@@ -17,6 +17,14 @@ class Event(BaseModel):
     type: str
     value: float | bool
     confidence: float
+
+ALLOWED_EVENT_TYPES = {"attention", "offroad", "phone", "drowsy"}
+
+class EventIn(BaseModel):
+    ts: str | None = None
+    type: str
+    value: float | bool
+    confidence: float = Field(ge = 0.0, le = 1.0)
     
 class Stats(BaseModel):
     session_id: str
@@ -158,3 +166,27 @@ def get_session_stats(session_id: str):
         phone_pct=pct(phone_count, total),
         drowsy_pct=pct(drowsy_count, total),
     )
+
+@app.post("/sessions/{session_id}/events", response_model = Event, status_code = 201)
+def add_session_event(session_id: str, payload: EventIn):
+    if session_id not in MOCK_SESSIONS:
+        raise HTTPException(status_code=404, detail = "Session not found")
+    if payload.type not in ALLOWED_EVENT_TYPES:
+        raise HTTPException(status_code=422, detail = f"Unknown event type: {payload.type}")
+    if payload.type == "attention":
+        if isinstance(payload.value, bool) or not isinstance(payload.value, (int, float)):
+            raise HTTPException(status_code=422, detail = f"attention.value must be a number")
+    else:
+        if not isinstance(payload.value, bool):
+            raise HTTPException(status_code=422, detail = f"{payload.type}.value must be boolean")
+    ts = payload.ts or datetime.now(timezone.utc).isoformat()
+
+    ev = Event(
+        ts = ts,
+        type = payload.type,
+        value = payload.value,
+        confidence=payload.confidence,
+    )
+
+    MOCK_EVENTS.setdefault(session_id, []).append(ev)
+    return ev
