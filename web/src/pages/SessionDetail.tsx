@@ -63,8 +63,11 @@ export default function SessionDetail() {
         if (e instanceof DOMException && e.name === "AbortError") return;
 
         if (e instanceof HttpError) {
-          const body = e.body as any;
-          const detail = body && typeof body === "object" && "detail" in body ? String(body.detail) : "";
+          const body = e.body;
+          const detail =
+            body && typeof body === "object" && "detail" in body
+              ? String((body as Record<string, unknown>).detail)
+              : "";
           setError(detail ? `${e.status}: ${detail}` : `${e.status}: ${e.message}`);
           return;
         }
@@ -136,7 +139,7 @@ export default function SessionDetail() {
           </tr>
         </thead>
         <tbody>
-          {filteredEvents.map((e, idx) => (
+          {filteredEvents.map((e) => (
             <tr key={`${e.ts}-${e.type}`}>
               <td style = {cell}>
                 {new Date(e.ts).toLocaleTimeString()}

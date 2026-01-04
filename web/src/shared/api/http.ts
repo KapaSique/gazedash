@@ -44,10 +44,11 @@ export async function requestJson<T>(url: string, opts: RequestOpts = {}): Promi
   const data = text ? safeJson(text) : null;
 
   if (!res.ok) {
-    const msg =
-      typeof data === "object" && data !== null && "detail" in (data as any)
-        ? String((data as any).detail)
-        : `HTTP ${res.status}`;
+    const detail =
+      data && typeof data === "object" && "detail" in data
+        ? (data as Record<string, unknown>).detail
+        : null;
+    const msg = detail ? String(detail) : `HTTP ${res.status}`;
     throw new HttpError(res.status, url, msg, data);
   }
 

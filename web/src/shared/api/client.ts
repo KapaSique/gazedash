@@ -43,6 +43,14 @@ export type Stats = {
 //     return res.json() as Promise<T>;
 // }
 
+async function postJson<T>(url: string, data: unknown, signal?: AbortSignal): Promise<T> {
+    return requestJson<T>(url, {
+        method: "POST",
+        body: data,
+        signal,
+    });
+}
+
 export function getSessions(signal?: AbortSignal): Promise<Session[]> {
     return requestJson<Session[]>(`${API_URL}/sessions`, {signal});
 }
@@ -57,4 +65,8 @@ export function getSessionEvents(id: string, signal?: AbortSignal): Promise<Even
 
 export function getSessionStats(id: string, signal?: AbortSignal): Promise<Stats>{
     return requestJson<Stats>(`${API_URL}/sessions/${id}/stats`, {signal});
+}
+
+export function postSessionEvents(id: string, events: Event[], signal?: AbortSignal): Promise<string> {
+    return postJson<string>(`${API_URL}/sessions/${id}/events`, events, signal);
 }
