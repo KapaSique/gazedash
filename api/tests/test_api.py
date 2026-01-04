@@ -3,7 +3,6 @@ import sys
 
 from fastapi.testclient import TestClient
 
-# Ensure the `api/` directory is on sys.path so tests work no matter where pytest is launched from.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from main import app
