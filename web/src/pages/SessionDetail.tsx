@@ -1,38 +1,53 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams} from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { HttpError } from "../shared/api/http";
 import * as api from "../shared/api/client";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { MetricCard } from "@/shared/ui/MetricCard";
 
 type Session = api.Session;
 type Event = api.Event;
 type Stats = api.Stats;
 
 export default function SessionDetail() {
-  const { id } = useParams<{ id: string}>();
+  const { id } = useParams<{ id: string }>();
 
   const [session, setSession] = useState<Session | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc"> ("asc");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
-  const page: React.CSSProperties = {padding: 16};
-  const cell: React.CSSProperties = {padding: 8, borderBottom: "1px solid #222"};
-  const headCell: React.CSSProperties = {padding: 8, borderBottom: "1px solid #333"};
-
-  const title = useMemo(() => (id ? `Session ${id}` : "Session"), [id]);
-
-  const eventTypes = useMemo(() => {
-    const uniq = Array.from(new Set(events.map(e => e.type)));
+  const uniqueTypes = useMemo(() => {
+    const uniq = Array.from(new Set(events.map((e) => e.type)));
     uniq.sort();
-    return ["all", ...uniq];
+    return uniq;
   }, [events]);
 
-  const filteredEvents = useMemo(() =>{
-    const arr = typeFilter === "all" ? events : events.filter(e => e.type === typeFilter);
-    
+  const filteredEvents = useMemo(() => {
+    const arr = typeFilter === "all" ? events : events.filter((e) => e.type === typeFilter);
+
     const sorted = [...arr].sort((a, b) => {
       const ta = new Date(a.ts).getTime();
       const tb = new Date(b.ts).getTime();
@@ -43,9 +58,9 @@ export default function SessionDetail() {
 
   useEffect(() => {
     if (!id) return;
-    
+
     const ac = new AbortController();
-    (async() => {
+    (async () => {
       try {
         setLoading(true);
         setError(null);
@@ -80,104 +95,154 @@ export default function SessionDetail() {
     return () => ac.abort();
   }, [id]);
 
-  if (!id) return <div style = {page}>No session id in URL</div>;
-  if (loading) return <div style = {page}>Loading session...</div>;
-  if (error) return <div style = {page}>Error: {error}</div>;
+  if (!id) {
+    return (
+      <Alert>
+        <AlertTitle>No session id</AlertTitle>
+        <AlertDescription>В URL нет id сессии.</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-7 w-40" />
+        <Skeleton className="h-4 w-64" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
-    <div style = {page}>
-      <div style = {{marginBottom : 12}}>
-        <Link to = "/sessions">Back to sessions</Link>
-        <Link to = {`/sessions/${id}/timeline`}>Timeline</Link>
+    <div className="space-y-4">
+      <div className="flex items-center gap-4">
+        <Link className="text-primary hover:underline" to="/sessions">
+          Back to sessions
+        </Link>
+        <span className="text-muted-foreground">|</span>
+        <Link className="text-primary hover:underline" to={`/sessions/${id}/timeline`}>
+          Timeline
+        </Link>
       </div>
 
-      <h2>{title}</h2>
+      <h1 className="text-3xl font-semibold tracking-tight">Session {id}</h1>
 
       {session ? (
-        <div style = {{opacity: 0.85, marginBottom: 16}}>
-          <div><b>Started:</b> {new Date(session.started_at).toLocaleString()}</div>
-          <div><b>Source:</b> {session.source}</div>
-          {session.notes ? <div><b>Notes:</b> {session.notes}</div> : null}
+        <div className="space-y-1 text-sm text-muted-foreground">
+          <div>
+            <span className="font-medium text-foreground">Started:</span>{" "}
+            {new Date(session.started_at).toLocaleString()}
+          </div>
+          <div>
+            <span className="font-medium text-foreground">Source:</span>{" "}
+            <Badge variant="secondary">{session.source}</Badge>
+          </div>
+          {session.notes ? (
+            <div>
+              <span className="font-medium text-foreground">Notes:</span> {session.notes}
+            </div>
+          ) : null}
         </div>
       ) : null}
-      <div style = {{display: "flex", gap: 12, alignItems: "center", margin: "8px 0 12px"}}>
-        <label style = {{opacity: 0.8}}>Type:</label>
-        <select value ={typeFilter} onChange={(e => setTypeFilter(e.target.value))}>
-          {eventTypes.map((t) => (
-            <option key = {t} value = {t}>{t}</option>
-          ))}
-        </select>
-        <button
-        onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-        style = {{padding: "6px 10px", borderRadius: 10, border: "1px solid #333", background: "transparent"}}>
+
+      <Separator className="my-4" />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Type:</span>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">all</SelectItem>
+              {uniqueTypes.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <Button
+          variant="outline"
+          onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+        >
           Sort: {sortDir.toUpperCase()}
-        </button>
+        </Button>
       </div>
 
       {stats ? (
-        <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-          <StatCard label="Events total" value={stats.events_total} />
-          <StatCard label="Duration" value={formatDuration(stats.duration_sec ?? 0)} />
-          <StatCard label="Attention" value={`${(stats.attention_pct ?? 0).toFixed(1)}%`} />
-          <StatCard label="Offroad" value={`${(stats.offroad_pct ?? 0).toFixed(1)}%`} />
-          <StatCard label="Phone" value={`${(stats.phone_pct ?? 0).toFixed(1)}%`} />
-          <StatCard label="Drowsy" value={`${(stats.drowsy_pct ?? 0).toFixed(1)}%`} />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          <MetricCard title="Events total" value={`${stats.events_total}`} />
+          <MetricCard title="Duration" value={`${Math.round(stats.duration_sec)}s`} />
+          <MetricCard title="Attention" value={`${stats.attention_pct.toFixed(1)}%`} />
+          <MetricCard title="Offroad" value={`${stats.offroad_pct.toFixed(1)}%`} />
+          <MetricCard title="Phone" value={`${stats.phone_pct.toFixed(1)}%`} />
+          <MetricCard title="Drowsy" value={`${stats.drowsy_pct.toFixed(1)}%`} />
         </div>
       ) : null}
 
-      <h3>Events</h3>
-      {filteredEvents.length === 0 ?(
-        <div>No events</div>
+      <h2 className="mt-8 text-xl font-semibold">Events</h2>
+
+      {filteredEvents.length === 0 ? (
+        <div className="mt-3 text-sm text-muted-foreground">No events</div>
       ) : (
-        <table style={{width: "100%", borderCollapse: "collapse"}}>
-        <thead>
-          <tr style = {{textAlign: "left", opacity: 0.8}}>
-            <th style = {headCell}>Time</th>
-            <th style = {headCell}>Type</th>
-            <th style = {headCell}>Value</th>
-            <th style = {headCell}>Confidence</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredEvents.map((e) => (
-            <tr key={`${e.ts}-${e.type}`}>
-              <td style = {cell}>
-                {new Date(e.ts).toLocaleTimeString()}
-              </td>
-              <td style = {cell}>{e.type}</td>
-              <td style = {cell}>
-                {typeof e.value === "boolean" ? (e.value ? "true" : "false") : e.value.toFixed(2)}
-              </td>
-              <td style ={cell}>{e.confidence.toFixed(2)}</td>
-            </tr>
-          ))}
-        </tbody>
-        </table>
+        <div className="mt-3 rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[140px]">Time</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Value</TableHead>
+                <TableHead className="text-right">Confidence</TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {filteredEvents.map((e, idx) => (
+                <TableRow key={idx}>
+                  <TableCell className="font-medium">
+                    {new Date(e.ts).toLocaleTimeString()}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{e.type}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {typeof e.value === "boolean"
+                      ? e.value
+                        ? "true"
+                        : "false"
+                      : Number(e.value).toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {Number(e.confidence).toFixed(2)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   );
-} 
-
-function StatCard({label, value} : {label: string; value: React.ReactNode,}){
-  return (
-    <div style = {{
-      border: "1px solid #333",
-      borderRadius: 12,
-      padding: 12,
-      minWidth: 160,
-      background: "rgba(255, 255, 255, 0.02)"
-    }}>
-      <div style = {{opacity: 0.75, fontSize: 12}}>{label}</div>
-      <div style = {{fontSize: 22, fontWeight: 700}}>{value}</div>
-    </div>
-  );
-}
-
-function formatDuration(sec: number){
-  if (!Number.isFinite(sec) || sec <= 0) return "0s";
-  const s = Math.floor(sec);
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  if (m <= 0) return `${r}s`;
-  return `${m}m ${String(r).padStart(2, "0")}s`;
 }
