@@ -1,7 +1,7 @@
 from datetime import datetime, timezone, timedelta
 from typing import List
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -13,6 +13,12 @@ class Session(BaseModel):
     notes: str | None = None
 
 class Event(BaseModel):
+    ts: str
+    type: str
+    value: float | bool
+    confidence: float
+
+class EventIn(BaseModel):
     ts: str
     type: str
     value: float | bool
@@ -105,6 +111,13 @@ def get_session_events(session_id: str):
     if session_id not in MOCK_SESSIONS:
         raise HTTPException(status_code=404, detail="Session not found")
     return MOCK_EVENTS.get(session_id, [])
+
+    MOCK_EVENTS.setdefault(session_id, [])
+    for e in events:
+        MOCK_EVENTS[session_id.append(
+            Event(ts=e.ts, type=e.type, value=e.value, confidence=e.confidence)
+        )]
+    return {"added": len(events), "session_id": session_id}
 
 @app.get("/sessions/{session_id}/stats", response_model=Stats)
 def get_session_stats(session_id: str):
