@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { HttpError } from "../shared/api/http";
 import * as api from "../shared/api/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -107,17 +107,14 @@ export default function SessionDetail() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-7 w-40" />
-        <Skeleton className="h-4 w-64" />
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-5 w-64" />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 w-full rounded-xl" />
+          ))}
         </div>
-        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-56 w-full rounded-xl" />
       </div>
     );
   }
@@ -132,48 +129,51 @@ export default function SessionDetail() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        <Link className="text-primary hover:underline" to="/sessions">
-          Back to sessions
-        </Link>
-        <span className="text-muted-foreground">|</span>
-        <Link className="text-primary hover:underline" to={`/sessions/${id}/timeline`}>
-          Timeline
-        </Link>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3 text-sm">
+          <Link className="text-primary hover:underline" to="/sessions">
+            Back to sessions
+          </Link>
+          <span className="text-muted-foreground">/</span>
+          <Link className="text-primary hover:underline" to={`/sessions/${id}/timeline`}>
+            Timeline
+          </Link>
+        </div>
+        {session ? <Badge variant="outline" className="font-mono">{session.source}</Badge> : null}
       </div>
 
-      <h1 className="text-3xl font-semibold tracking-tight">Session {id}</h1>
-
-      {session ? (
-        <div className="space-y-1 text-sm text-muted-foreground">
+      <div className="rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 shadow-lg">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <span className="font-medium text-foreground">Started:</span>{" "}
-            {new Date(session.started_at).toLocaleString()}
+            <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
+              Session
+            </p>
+            <h1 className="text-4xl font-semibold tracking-tight">#{id}</h1>
           </div>
-          <div>
-            <span className="font-medium text-foreground">Source:</span>{" "}
-            <Badge variant="secondary">{session.source}</Badge>
-          </div>
-          {session.notes ? (
-            <div>
-              <span className="font-medium text-foreground">Notes:</span> {session.notes}
-            </div>
-          ) : null}
+          <Badge variant="secondary" className="h-8 rounded-full px-3 text-xs uppercase">
+            {filteredEvents.length} events
+          </Badge>
         </div>
-      ) : null}
 
-      <Separator className="my-4" />
+        {session ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <InfoRow label="Started" value={new Date(session.started_at).toLocaleString()} />
+            <InfoRow label="Source" value={<Badge variant="outline">{session.source}</Badge>} />
+            {session.notes ? <InfoRow label="Notes" value={session.notes} className="sm:col-span-2" /> : null}
+          </div>
+        ) : null}
+      </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card/60 p-4 shadow-sm">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Type:</span>
+          <span className="text-sm text-muted-foreground">Type</span>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-44">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">all</SelectItem>
+              <SelectItem value="all">All</SelectItem>
               {uniqueTypes.map((t) => (
                 <SelectItem key={t} value={t}>
                   {t}
@@ -182,7 +182,6 @@ export default function SessionDetail() {
             </SelectContent>
           </Select>
         </div>
-
         <Button
           variant="outline"
           onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
@@ -202,47 +201,75 @@ export default function SessionDetail() {
         </div>
       ) : null}
 
-      <h2 className="mt-8 text-xl font-semibold">Events</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold tracking-tight">Events</h2>
+        <Badge variant="secondary" className="tabular-nums">
+          {filteredEvents.length}
+        </Badge>
+      </div>
 
-      {filteredEvents.length === 0 ? (
-        <div className="mt-3 text-sm text-muted-foreground">No events</div>
-      ) : (
-        <div className="mt-3 rounded-lg border">
+      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        {filteredEvents.length === 0 ? (
+          <div className="p-6 text-sm text-muted-foreground">No events</div>
+        ) : (
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-[140px]">Time</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Value</TableHead>
-                <TableHead className="text-right">Confidence</TableHead>
+              <TableRow className="bg-muted/60">
+                <TableHead className="w-[140px] text-xs uppercase tracking-wider">
+                  Time
+                </TableHead>
+                <TableHead className="text-xs uppercase tracking-wider">Type</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider">Value</TableHead>
+                <TableHead className="text-right text-xs uppercase tracking-wider">
+                  Confidence
+                </TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
               {filteredEvents.map((e, idx) => (
-                <TableRow key={idx}>
-                  <TableCell className="font-medium">
+                <TableRow key={`${e.ts}-${idx}`} className="hover:bg-muted/40">
+                  <TableCell className="font-mono tabular-nums">
                     {new Date(e.ts).toLocaleTimeString()}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{e.type}</Badge>
+                    <Badge variant="outline" className="capitalize">
+                      {e.type}
+                    </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="tabular-nums">
                     {typeof e.value === "boolean"
                       ? e.value
                         ? "true"
                         : "false"
                       : Number(e.value).toFixed(2)}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right tabular-nums">
                     {Number(e.confidence).toFixed(2)}
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </div>
-      )}
+        )}
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={["flex flex-col gap-1", className].filter(Boolean).join(" ")}>
+      <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</span>
+      <span className="text-base font-medium leading-tight text-foreground">{value}</span>
     </div>
   );
 }
