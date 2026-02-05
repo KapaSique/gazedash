@@ -63,7 +63,7 @@ export default function SessionDetail() {
     const ac = new AbortController();
     setImporting(true);
     try{
-      await api.importSessionEvents(id!, eventsToSend, ac.signal);
+      await api.postSessionEvents(id!, eventsToSend, ac.signal);
       const [s, ev, st] = await Promise.all([
         api.getSession(id!, ac.signal),
         api.getSessionEvents(id!, ac.signal),
